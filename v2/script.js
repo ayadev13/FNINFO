@@ -462,26 +462,46 @@ window.addEventListener('load', () => {
   fetchPlaylists();
 });
 
-const NEWS_TAGS = [
-  "Product.BR", 
-  "Product.Juno", 
+// マッピング定義
+const NEWS_TAG_MAP = {
+  "バトルロワイヤル": "Product.BR",
+  "レゴフォートナイト": "Product.Juno",
+  "リロード": "Product.BlastBerry",
+  "ランクリロード": "Product.BR.Habanero",
+  "ゼロビルド": "Product.BR.NoBuild",
+  "フォートナイトOG": "Product.Figment",
+  "フォートナイトFestival ": "Product.Sparks",
+  "世界を救え": "Product.STW"
+};
+
+// APIで使用するタグのリスト（キーはNEWS_TAG_MAPの値と同じ）
+const NEWS_TAGS_FOR_API = [
+  "Product.BR",
+  "Product.Juno",
   "Product.BlastBerry",
-  "Product.BR.Habanero", 
-  "Product.BR.NoBuild", 
+  "Product.BR.Habanero",
+  "Product.BR.NoBuild",
   "Product.Figment",
-  "Product.Sparks", 
+  "Product.Sparks",
   "Product.STW"
 ];
 
 function setupNewsDropdown() {
   const select = document.getElementById('news-tag-select');
   if (!select) return;
-  select.innerHTML = NEWS_TAGS
-    .map(tag => `<option value="${tag}">${tag}</option>`)
+  
+  // NEWS_TAG_MAPのキー（日本語名）を使ってオプションを作成
+  select.innerHTML = Object.entries(NEWS_TAG_MAP)
+    .map(([japaneseName, productValue]) => `<option value="${productValue}">${japaneseName}</option>`)
     .join('');
 }
 
 async function fetchNewsByTag(tag) {
+  // tagが指定されていない場合は、デフォルトで最初のタグを使用する
+  if (!tag && NEWS_TAGS_FOR_API.length > 0) {
+    tag = NEWS_TAGS_FOR_API[0];
+  }
+
   const dom = document.getElementById('news-content');
   dom.innerHTML = '<div class="loader"></div>';
   try {
@@ -510,6 +530,42 @@ async function fetchNewsByTag(tag) {
     dom.innerHTML = `<div class="error"> ${err.message}</div>`;
   }
 }
+
+window.addEventListener('DOMContentLoaded', () => {
+  setupNewsDropdown();
+  document.getElementById('news-search-btn').addEventListener('click', () => {
+    const select = document.getElementById('news-tag-select');
+    const tag = select.value;
+    fetchNewsByTag(tag);
+  });
+});
+  const dom = document.getElementById('news-content');
+  dom.innerHTML = '<div class="loader"></div>';
+  try {
+    const res = await fetch(`https://fljpapi.vigyanfv.workers.dev/news?platform=Windows&language=ja&serverRegion=ASIA&country=JP&tags=${tag}`);
+    if (!res.ok) throw new Error('');
+    const data = await res.json();
+    const items = data?.data?.contentItems || [];
+    if (!items.length) {
+      dom.innerHTML = '<div class="error">現在ニュースはありません。</div>';
+      return;
+    }
+    dom.innerHTML = `<div class="card-list">
+      ${items.map(msg => {
+        const f = msg.contentFields || {};
+        let html = `<ul class="info-list">`;
+        if (f.FullScreenTitle) html += `<li><strong>タイトル:</strong> ${f.FullScreenTitle}</li>`;
+        if (f.FullScreenBody) html += `<li>${f.FullScreenBody}</li>`;
+        if (f.TeaserTitle && f.TeaserTitle !== "​") html += `<li><strong>サブタイトル:</strong> ${f.TeaserTitle}</li>`;
+        if (Array.isArray(f.FullScreenBackground?.Image))
+          html += `<li><img src="${f.FullScreenBackground.Image[0].url}" style="max-width:100%;border-radius:0.5em;"></li>`;
+        html += `</ul>`;
+        return `<div class="card">${html}</div>`;
+      }).join('')}
+    </div>`;
+  } catch (err) {
+    dom.innerHTML = `<div class="error"> ${err.message}</div>`;
+  }
 
 window.addEventListener('DOMContentLoaded', () => {
   setupNewsDropdown();
